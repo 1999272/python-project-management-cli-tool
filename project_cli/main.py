@@ -1,8 +1,7 @@
 import argparse
-from utils.helpers import load_data, save_data
-from rich.console import Console
+from utils.helpers import load_data
+from tabulate import tabulate
 
-console = Console()
 DATA_FILE = "data/datastore.json"
 
 def main():
@@ -14,42 +13,47 @@ def main():
     user_parser.add_argument("--name", required=True)
     user_parser.add_argument("--email", required=True)
 
+    # add-project
+    project_parser = subparsers.add_parser("add-project")
+    project_parser.add_argument("--user", required=True)
+    project_parser.add_argument("--title", required=True)
+    project_parser.add_argument("--description", required=True)
+    project_parser.add_argument("--due_date", required=True)
+
     # list-projects
     list_parser = subparsers.add_parser("list-projects")
     list_parser.add_argument("--user", required=True)
-
-    # complete-task
-    complete_parser = subparsers.add_parser("complete-task")
-    complete_parser.add_argument("--user", required=True)
-    complete_parser.add_argument("--project", required=True)
-    complete_parser.add_argument("--task", required=True)
 
     args = parser.parse_args()
     data = load_data(DATA_FILE)
 
     if args.command == "add-user":
         data["users"].append({"name": args.name, "email": args.email, "projects": []})
+        from utils.helpers import save_data
         save_data(DATA_FILE, data)
-        console.print(f"[green]User {args.name} added successfully![/]")
+        print(f"User {args.name} added.")
+
+    elif args.command == "add-project":
+        for user in data["users"]:
+            if user["name"] == args.user:
+                user["projects"].append({
+                    "title": args.title,
+                    "description": args.description,
+                    "due_date": args.due_date,
+                    "tasks": []
+                })
+                from utils.helpers import save_data
+                save_data(DATA_FILE, data)
+                print(f"Project {args.title} added to {args.user}.")
+                return
+        print(f"User {args.user} not found.")
 
     elif args.command == "list-projects":
         for user in data["users"]:
             if user["name"] == args.user:
-                console.print(f"[bold cyan]Projects for {user['name']}:[/]")
-                for proj in user["projects"]:
-                    console.print(f"- {proj['title']} (Due: {proj['due_date']})")
-
-    elif args.command == "complete-task":
-        for user in data["users"]:
-            if user["name"] == args.user:
-                for proj in user["projects"]:
-                    if proj["title"] == args.project:
-                        for task in proj["tasks"]:
-                            if task["title"] == args.task:
-                                task["status"] = "complete"
-                                save_data(DATA_FILE, data)
-                                console.print(f"[yellow]Task {task['title']} marked complete.[/]")
-                                return
-
-if __name__ == "__main__":
-    main()
+                projects = [[proj["title"], proj["description"], proj["due_date"]] 
+                            for proj in user["projects"]]
+                if projects:
+                    print(tabulate(projects, headers=["Title", "Description", "Due Date"]))
+                else:
+                    print(f"No projects found for {args.user}.")
